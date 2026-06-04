@@ -8,6 +8,7 @@ os.environ["MKL_NUM_THREADS"] = "1"
 # and without these the default settings swamped system with lots of warnings on my MacbookPro:
 os.environ["MLFLOW_GENAI_EVAL_MAX_WORKERS"] = "3"
 os.environ["MLFLOW_GENAI_EVAL_MAX_SCORER_WORKERS"] = "1"
+os.environ["MLFLOW_ENABLE_ASYNC_TRACE_LOGGING"] = "true"  # re typeerror in smoke_test
 ###
 
 import os
@@ -28,6 +29,7 @@ params = {
   "dataset_name": "legal_rag_eval_v1_subset",
   "experiment_name": "History docs RAG",
   "mlflow_tracking_uri": "http://localhost:5000",
+  "debug": True,
 }
 
 
@@ -42,17 +44,18 @@ url_listings = get_url_listings()
 vector_db = utils.create_faiss_database(url_listings, persist_dir)
 
 
-print("Debug: verifying retrieval is set up correctly...")
-test_question = "Which amendment abolished slavery?"
-print(f"searching docs with question: {test_question}")
-retriever = vector_db.as_retriever(search_kwargs={"k": 4})
-docs = retriever.invoke(test_question)
-print("Retrieved docs:", len(docs))
-for i, d in enumerate(docs, 1):
-    print(f"\nDoc {i} source:", d.metadata.get("source"))
-    print("Length:", len(d.page_content))
-    print(d.page_content[:300])
-print("\n")
+if params["debug"]:
+    print("Debug: verifying retrieval is set up correctly...")
+    test_question = "Which amendment abolished slavery?"
+    print(f"searching docs with question: {test_question}")
+    retriever = vector_db.as_retriever(search_kwargs={"k": 4})
+    docs = retriever.invoke(test_question)
+    print("Retrieved docs:", len(docs))
+    for i, d in enumerate(docs, 1):
+        print(f"\nDoc {i} source:", d.metadata.get("source"))
+        print("Length:", len(d.page_content))
+        print(d.page_content[:300])
+    print("\n")
 
 
 local_persist_dir = Path("faiss_index")
@@ -85,7 +88,8 @@ test_question = "What amendment addresses protections on the right to vote?"
 answer1 = loaded_model.predict([{"query": test_question}])
 utils.print_formatted_response(answer1)
 
-use_retrieval_scorers = smoke_test.run_smoke_test(loaded_model, model_info)
+if params["debug"]:
+    use_retrieval_scorers = smoke_test.run_smoke_test(loaded_model, model_info)
 
 
 # Create MLflow Evaluation Dataset

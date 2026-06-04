@@ -1,5 +1,7 @@
 # Smoke test: are retriever traces actually present?
 
+from time import sleep
+
 from mlflow.entities import SpanType
 import mlflow
 
@@ -10,6 +12,8 @@ def run_smoke_test(loaded_model, model_info):
 
     # Generate one fresh prediction / trace
     _ = loaded_model.predict([{"query": SMOKE_TEST_QUERY}])
+
+    sleep(1)  # see if this gets us past the no-traces-found-yet issue after predict()
 
     recent_traces = mlflow.search_traces(
         model_id=model_info.model_id,

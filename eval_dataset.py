@@ -1,12 +1,14 @@
 def get_url_listings():
-    return [
+    url_listings = [
         "https://www.archives.gov/milestone-documents/13th-amendment#transcript",
         "https://www.archives.gov/milestone-documents/14th-amendment#transcript",
         "https://www.archives.gov/milestone-documents/15th-amendment#transcript",
     ]
+    return url_listings
+
 
 def get_eval_records():
-    eval_records = {
+    eval_records = [
         {
         "inputs": {
             "query": "What did the 13th Amendment do regarding slavery?"
@@ -37,5 +39,5 @@ def get_eval_records():
             "expected_response": "The 15th Amendment prohibits denying or abridging the right to vote on account of race, color, or previous condition of servitude."
         }
         },
-    }
+    ]
     return eval_records
