@@ -92,6 +92,7 @@ test_question = "What amendment addresses protections on the right to vote?"
 answer1 = loaded_model.predict([{"query": test_question}])
 utils.print_formatted_response(answer1)
 
+use_retrieval_scorers = False
 if params["debug"]:
     use_retrieval_scorers = smoke_test.run_smoke_test(loaded_model, model_info)
 
