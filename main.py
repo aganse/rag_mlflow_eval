@@ -1,4 +1,4 @@
-### setting these env-vars is only necessary for MacOS:
+### setting these env-vars is needed in MacOS on my MacBookPro:
 import os
 os.environ["OMP_NUM_THREADS"] = "1"
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
@@ -19,25 +19,30 @@ import tempfile
 from mlflow.genai.datasets import create_dataset, get_dataset
 import mlflow
 
-from eval_dataset import get_url_listings, get_eval_records
+from eval_dataset import get_dataset_name, get_url_listings, get_eval_records
 import scorers
 import smoke_test
 import utils
 
 
 params = {
-  "dataset_name": "legal_rag_eval_v1_subset",
   "experiment_name": "History docs RAG",
   "mlflow_tracking_uri": "http://localhost:5000",
-  "debug": True,
+  "debug": False,
 }
 
 
+params["dataset_name"] = get_dataset_name()
+
 assert "OPENAI_API_KEY" in os.environ, "Please set the OPENAI_API_KEY environment variable."
+mlflow.set_tracking_uri(params["mlflow_tracking_uri"])
+mlflow.set_experiment(params["experiment_name"])
+
 mlflow.langchain.autolog()  # log_traces=True, log_models=True, log_model_signatures=True, log_input_examples=True)
 mlflow.tracing.disable_notebook_display()
 
 
+# Set up FAISS vector database storage
 temporary_directory = tempfile.mkdtemp()
 persist_dir = os.path.join(temporary_directory, "faiss_index")
 url_listings = get_url_listings()
@@ -62,9 +67,6 @@ local_persist_dir = Path("faiss_index")
 if local_persist_dir.exists():
     shutil.rmtree(local_persist_dir)
 shutil.copytree(persist_dir, local_persist_dir)
-
-mlflow.set_tracking_uri(params["mlflow_tracking_uri"])
-mlflow.set_experiment(params["experiment_name"])
 
 
 with mlflow.start_run():
@@ -118,13 +120,10 @@ print("Dataset ready:", dataset.name, dataset.dataset_id)
 print("Added / merged", len(eval_records), "records")
 
 
-scorers = select_scorers(use_retrieval_scorers)
-
-
 results = mlflow.genai.evaluate(
     data=dataset,
-    predict_fn=evaluate_logged_rag_model,
-    scorers=scorers,
+    predict_fn=scorers.make_predict_fn(loaded_model),
+    scorers=scorers.get_scorers(use_retrieval_scorers),
     model_id=model_info.model_id,  # optional, but useful to keep tied to the logged model
 )
 

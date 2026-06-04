@@ -29,9 +29,6 @@ vector_db = FAISS.load_local(
 
 retriever = vector_db.as_retriever(search_kwargs={"k": 4})  # default is 4, just making explicit
 
-# retriever = vector_db.as_retriever()  # could try updating k as arg here via: search_kwargs={"k": 3}
-#                                       # by default k=4.
-
 prompt = ChatPromptTemplate.from_messages(
     [
         (

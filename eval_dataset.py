@@ -1,3 +1,7 @@
+def get_dataset_name():
+    return "usmilestonedocs_civilwar_3docsubset"
+
+
 def get_url_listings():
     url_listings = [
         "https://www.archives.gov/milestone-documents/13th-amendment#transcript",
@@ -22,6 +26,11 @@ def get_eval_records():
         "inputs": {
             "query": "What are three major constitutional principles established by the 14th Amendment?"
         },
+        # "expectations": {
+        #     "expected_response": [
+        #         "It established birthright citizenship, prohibited states from depriving persons of due process of law, and required states to provide equal protection of the laws."
+        #     ]
+        # }
         "expectations": {
             "expected_facts": [
                 "It established birthright citizenship.",
@@ -30,7 +39,6 @@ def get_eval_records():
             ]
         }
         },
-
         {
         "inputs": {
             "query": "What voting rights protection is provided by the 15th Amendment?"
@@ -41,3 +49,5 @@ def get_eval_records():
         },
     ]
     return eval_records
+
+

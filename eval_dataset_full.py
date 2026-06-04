@@ -1,3 +1,7 @@
+def get_dataset_name():
+    return "usmilestonedocs_civilwar_all16"
+
+
 def get_url_listings():
     url_listings = [
         "https://www.archives.gov/milestone-documents/compromise-of-1850#transcript",
@@ -16,8 +20,6 @@ def get_url_listings():
         "https://www.archives.gov/milestone-documents/fort-laramie-treaty#transcript",
         "https://www.archives.gov/milestone-documents/14th-amendment#transcript",
         "https://www.archives.gov/milestone-documents/15th-amendment#transcript",
-        "https://www.archives.gov/milestone-documents/act-establishing-yellowstone-national-park#transcript",
-        "https://www.archives.gov/milestone-documents/sherman-anti-trust-act#transcript",
     ]
     return url_listings
 

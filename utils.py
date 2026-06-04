@@ -13,13 +13,13 @@ faiss.omp_set_num_threads(1)
 
 def fetch_federal_document(url, div_class):
     """
-    Scrapes the transcript of the Act Establishing Yellowstone National Park from the given URL.
+    Scrapes the transcript of the US Milestones document from the given Archives.gov URL.
 
     Args:
     url (str): URL of the webpage to scrape.
 
     Returns:
-    str: The transcript text of the Act.
+    str: The transcript text of the document.
     """
     # Sending a request to the URL
     response = requests.get(url)
@@ -75,59 +75,6 @@ def create_faiss_database(url_list, database_save_directory, chunk_size=500, chu
     faiss_database.save_local(database_save_directory)
 
     return faiss_database
-
-
-# def fetch_and_save_documents(url_list, doc_path):
-#     """
-#     Fetches documents from given URLs and saves them to a specified file path.
-
-#     Args:
-#         url_list (list): List of URLs to fetch documents from.
-#         doc_path (str): Path to the file where documents will be saved.
-#     """
-#     for url in url_list:
-#         document = fetch_federal_document(url, "col-sm-9")
-#         with open(doc_path, "a") as file:
-#             file.write(document)
-
-
-# def create_faiss_database(document_path, database_save_directory, chunk_size=500, chunk_overlap=10):
-#     """
-#     Creates and saves a FAISS database using documents from the specified file.
-
-#     Args:
-#         document_path (str): Path to the file containing documents.
-#         database_save_directory (str): Directory where the FAISS database will be saved.
-#         chunk_size (int, optional): Size of each document chunk. Default is 500.
-#         chunk_overlap (int, optional): Overlap between consecutive chunks. Default is 10.
-
-#     Returns:
-#         FAISS database instance.
-#     """
-#     # Load documents from the specified file
-#     # document_loader = TextLoader(document_path)
-#     # raw_documents = document_loader.load()
-#     with open(document_path, "r", encoding="utf-8") as f:
-#         text = f.read()
-#     raw_documents = [
-#         Document(
-#             page_content=text,
-#             metadata={"source": document_path},
-#         )
-#     ]
-
-#     # Split documents into smaller chunks with specified size and overlap
-#     document_splitter = CharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
-#     document_chunks = document_splitter.split_documents(raw_documents)
-
-#     # Generate embeddings for each document chunk
-#     embedding_generator = OpenAIEmbeddings()
-#     faiss_database = FAISS.from_documents(document_chunks, embedding_generator)
-
-#     # Save the FAISS database to the specified directory
-#     faiss_database.save_local(database_save_directory)
-
-#     return faiss_database
 
 
 def print_formatted_response(response_list, max_line_length=80):
