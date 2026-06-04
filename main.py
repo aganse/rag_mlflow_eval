@@ -1,3 +1,5 @@
+"""Run the end-to-end MLflow RAG evaluation workflow."""
+
 ### setting these env-vars is needed in MacOS on my MacBookPro:
 import os
 os.environ["OMP_NUM_THREADS"] = "1"

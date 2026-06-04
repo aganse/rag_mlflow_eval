@@ -1,6 +1,9 @@
+"""Utility helpers for fetching source documents and building the FAISS store."""
+
+from collections.abc import Sequence
+
 from bs4 import BeautifulSoup
 import faiss
-from langchain_text_splitters import CharacterTextSplitter
 from langchain_core.documents import Document
 from langchain_community.vectorstores import FAISS
 from langchain_openai import OpenAIEmbeddings
@@ -11,16 +14,17 @@ import requests
 faiss.omp_set_num_threads(1)
 
 
-def fetch_federal_document(url, div_class):
-    """
-    Scrapes the transcript of the US Milestones document from the given Archives.gov URL.
+def fetch_federal_document(url: str, div_class: str) -> str:
+    """Fetch the transcript text for a U.S. Milestones document page.
 
     Args:
-    url (str): URL of the webpage to scrape.
+        url: The Archives.gov page to scrape.
+        div_class: The HTML class containing the transcript content.
 
     Returns:
-    str: The transcript text of the document.
+        The extracted transcript text, or an error message when retrieval fails.
     """
+
     # Sending a request to the URL
     response = requests.get(url)
     if response.status_code == 200:
@@ -37,10 +41,16 @@ def fetch_federal_document(url, div_class):
         return f"Failed to retrieve the webpage. Status code: {response.status_code}"
 
 
-def fetch_documents(url_list):
+def fetch_documents(url_list: Sequence[str]) -> list[Document]:
+    """Fetch source pages and wrap each one in a LangChain document.
+
+    Args:
+        url_list: The source URLs to retrieve.
+
+    Returns:
+        A list of documents with source metadata preserved.
     """
-    Fetch documents from URLs and keep each source as its own LangChain Document.
-    """
+
     docs = []
     for url in url_list:
         text = fetch_federal_document(url, "col-sm-9")
@@ -53,10 +63,24 @@ def fetch_documents(url_list):
     return docs
 
 
-def create_faiss_database(url_list, database_save_directory, chunk_size=500, chunk_overlap=50):
+def create_faiss_database(
+    url_list: Sequence[str],
+    database_save_directory: str,
+    chunk_size: int = 500,
+    chunk_overlap: int = 50,
+) -> FAISS:
+    """Create and persist a FAISS vector store from source URLs.
+
+    Args:
+        url_list: The source URLs to ingest.
+        database_save_directory: The local directory where the FAISS index is saved.
+        chunk_size: The maximum chunk size used during splitting.
+        chunk_overlap: The overlap between adjacent chunks.
+
+    Returns:
+        The populated FAISS vector store.
     """
-    Creates and saves a FAISS database from separately chunked source documents.
-    """
+
     raw_documents = fetch_documents(url_list)
 
     splitter = RecursiveCharacterTextSplitter(
@@ -77,14 +101,17 @@ def create_faiss_database(url_list, database_save_directory, chunk_size=500, chu
     return faiss_database
 
 
-def print_formatted_response(response_list, max_line_length=80):
-    """
-    Formats and prints responses with a maximum line length for better readability.
+def print_formatted_response(
+    response_list: Sequence[str],
+    max_line_length: int = 80,
+) -> None:
+    """Print response strings with a fixed maximum line length.
 
     Args:
-    response_list (list): A list of strings representing responses.
-    max_line_length (int): Maximum number of characters in a line. Defaults to 80.
+        response_list: The response strings to print.
+        max_line_length: The maximum number of characters per output line.
     """
+
     for response in response_list:
         words = response.split()
         line = ""

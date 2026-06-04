@@ -1,4 +1,7 @@
+"""LangChain retrieval pipeline used for the logged MLflow model."""
+
 from pathlib import Path
+from typing import Any
 
 from langchain_classic.chains import create_retrieval_chain
 from langchain_classic.chains.combine_documents import create_stuff_documents_chain
@@ -49,11 +52,30 @@ question_answer_chain = create_stuff_documents_chain(
 
 chain = create_retrieval_chain(retriever, question_answer_chain)
 
-def to_chain_input(x):
-    return {"input": x["query"]}
+def to_chain_input(payload: dict[str, str]) -> dict[str, str]:
+    """Convert the pyfunc input payload into the chain's expected shape.
 
-def extract_answer(x):
-    return x["answer"]
+    Args:
+        payload: A single prediction record containing a ``query`` field.
+
+    Returns:
+        A dictionary with the ``input`` field expected by the retrieval chain.
+    """
+
+    return {"input": payload["query"]}
+
+
+def extract_answer(payload: dict[str, Any]) -> str:
+    """Extract the final answer text from the retrieval chain output.
+
+    Args:
+        payload: The retrieval chain output dictionary.
+
+    Returns:
+        The generated answer string.
+    """
+
+    return str(payload["answer"])
 
 model = RunnableLambda(to_chain_input) | chain | RunnableLambda(extract_answer)
 

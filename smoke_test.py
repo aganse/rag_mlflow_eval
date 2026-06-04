@@ -1,12 +1,29 @@
-# Smoke test: are retriever traces actually present?
+"""Smoke test helpers for verifying retriever traces in MLflow."""
 
 from time import sleep
+from typing import Any
 
 from mlflow.entities import SpanType
 import mlflow
+from mlflow.models.model import ModelInfo
 
 
-def run_smoke_test(loaded_model, model_info):
+def run_smoke_test(
+    loaded_model: mlflow.pyfunc.PyFuncModel,
+    model_info: ModelInfo,
+) -> bool:
+    """Verify that the logged model produces retriever spans in MLflow traces.
+
+    Args:
+        loaded_model: The loaded MLflow pyfunc model to invoke.
+        model_info: Metadata for the logged model under test.
+
+    Returns:
+        ``True`` when retriever spans are present and retrieval scorers can run.
+
+    Raises:
+        RuntimeError: If no traces are available after invoking the model.
+    """
 
     SMOKE_TEST_QUERY = "Which amendment involves birthright citizenship?"
 
@@ -39,7 +56,7 @@ def run_smoke_test(loaded_model, model_info):
         docs = span.outputs or []
         print(f"\nRetriever span {i}: {len(docs)} docs")
         if docs:
-            first_doc = docs[0]
+            first_doc: Any = docs[0]
             if isinstance(first_doc, dict):
                 preview = first_doc.get("page_content", "")
             else:
