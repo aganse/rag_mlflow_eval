@@ -36,7 +36,7 @@ params = {
     "retrieval_backend": "faiss",
     "dataset": "testB",
     "base_llm": "gpt-4o-mini",  # the arbitrary model the RAG is built around
-    "embedding_model": "text-embedding-ada-002",  # langchain default, "text-embedding-3-small" as possible good alternate
+    "embedding_model": "text-embedding-3-small",  # "text-embedding-3-small", "text-embedding-ada-002"(langchain default)
     "judge_llm": "openai:/gpt-4o-mini",  # mlflow default, note "openai:/" needed
     "chunk_size": 500,
     "chunk_overlap": 50,

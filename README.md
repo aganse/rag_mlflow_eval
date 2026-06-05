@@ -105,6 +105,10 @@ params = {
   - Controls the OpenAI embedding model used to build and query the FAISS
     index in `rag` mode.
   - Use `""` (or omit the key) to fall back to the current LangChain default.
+  - See [this MLflow page](https://mlflow.org/docs/latest/genai/eval-monitor/scorers/llm-judge/custom-judges/supported-models/#direct-model-providers)
+    for a list of model provider names and formatting for MLflow's LLM-judges.
+  - See [this OpenAI page](https://developers.openai.com/api/docs/guides/embeddings)
+    for a list of OpenAI embedding models (and prices) available via API.
 - `judge_llm`
   - Controls the MLflow LLM-as-a-judge model used by the evaluation scorers.
   - Use `""` (or omit the key) to fall back to MLflow's default judge model.
