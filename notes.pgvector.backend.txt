@@ -1,0 +1,155 @@
+pgvector backend notes / future design sketch
+============================================
+
+Goal
+----
+Add a future retrieval backend option using langchain-postgres + pgvector, while keeping the current repo simple and preserving the new mode split:
+- mode = "rag" | "no_rag"
+- retrieval_backend = "faiss" for now, later also "pgvector"
+
+Recommended near-term design principle
+--------------------------------------
+Refactor now so the app is organized around two independent decisions:
+1. whether retrieval is used at all
+2. which retrieval backend is used when retrieval is enabled
+
+That means:
+- no_rag should bypass all retrieval setup entirely
+- rag should call a backend-specific retriever builder
+- evaluation logic should derive retrieval-specific behavior from mode
+
+Suggested config shape
+----------------------
+For the current phase:
+- mode: "rag" | "no_rag"
+- retrieval_backend: "faiss"
+- verbose: bool
+- experiment_name
+- mlflow_tracking_uri
+
+Later, when pgvector is added, retrieval_backend can become:
+- "faiss"
+- "pgvector"
+
+Suggested code structure
+------------------------
+Keep orchestration separate from backend specifics.
+
+Potential modules:
+- main.py
+  Orchestrates dataset creation, model logging/loading, evaluation, and config.
+- chain_factory.py
+  Builds either a no-RAG chain or a RAG chain from config.
+- retrieval_backends/faiss_backend.py
+  FAISS-specific ingest/load/retriever creation.
+- retrieval_backends/pgvector_backend.py
+  Future pgvector-specific ingest/load/retriever creation.
+- scorers.py
+  General scorers + retrieval scorer selection derived from mode.
+
+Even if these exact files are not all created immediately, the code should move in this direction.
+
+What pgvector changes conceptually
+----------------------------------
+FAISS in the current repo is local, file-based, and easy to package with the logged model.
+pgvector is different because it depends on external database state.
+
+That introduces three design questions:
+1. How is the vector store populated?
+2. Where does runtime connectivity come from?
+3. What assumptions does the logged model make about the database already existing?
+
+Likely future config for pgvector
+---------------------------------
+Later pgvector support would probably need settings like:
+- postgres_uri or equivalent connection string
+- pgvector_collection / table name
+- embedding_model (optional, if made configurable later)
+- recreate_vector_store: bool
+- retrieval_top_k
+
+Potential additional settings if needed:
+- schema name
+- distance metric / index config
+- namespace or dataset label
+
+Likely implementation approaches
+--------------------------------
+Option A: build/populate pgvector during each run
+Pros:
+- reproducible from source URLs
+- easier for experiments
+Cons:
+- slower
+- more database setup churn
+- may repeatedly recreate embeddings
+
+Option B: assume pgvector store already exists and just connect to it
+Pros:
+- faster repeated evaluations
+- closer to production-style usage
+Cons:
+- more setup burden
+- less self-contained
+- easier to drift from the evaluated corpus unless carefully documented
+
+Recommendation for later:
+Start with Option A or support both via a simple flag. For experimentation, reproducibility is usually more valuable than speed.
+
+Important packaging/runtime difference vs FAISS
+----------------------------------------------
+With FAISS, the logged model can include local index artifacts.
+With pgvector, the logged model likely cannot be fully self-contained because retrieval depends on an external DB.
+
+That means the future pgvector path may require:
+- environment variables for DB connection at load/predict time
+- clear README instructions
+- possibly a runtime validation check with a helpful error if DB config is missing
+
+It may also mean the logged model should be thought of as:
+- chain definition + runtime dependency on DB
+rather than
+- fully packaged retriever state
+
+Questions to settle before implementation
+-----------------------------------------
+1. Should pgvector runs populate a fresh collection every time, or reuse one?
+2. Should collection/table naming be tied to dataset_name?
+3. Do we want FAISS to remain the default, self-contained backend?
+4. Should the same evaluation dataset always map to the same vector store contents?
+5. How should cleanup be handled for temporary experimental pgvector collections?
+
+Recommended default answers
+---------------------------
+- Keep FAISS as the default backend.
+- Keep no_rag independent from backend selection.
+- For pgvector, prefer reproducible population from the current source URLs.
+- Tie collection/table naming to dataset or experiment config to reduce ambiguity.
+- Document clearly that pgvector adds external infrastructure requirements.
+
+Evaluation implications
+-----------------------
+The same high-level eval flow should work for both retrieval backends:
+- Correctness
+- RelevanceToQuery
+- retrieval-specific scorers only when mode == "rag"
+
+But retrieval smoke testing may need to confirm that retriever spans are still emitted for the pgvector-backed chain.
+
+Migration strategy
+------------------
+Recommended sequence:
+1. First implement mode = rag/no_rag and clean config naming.
+2. Refactor chain/retriever construction so backend-specific retrieval is isolated.
+3. Keep FAISS as the only backend initially.
+4. Add pgvector backend later behind retrieval_backend = "pgvector".
+5. Update README with setup/run instructions for pgvector only once implemented.
+
+Definition of done for future pgvector addition
+-----------------------------------------------
+A good pgvector addition would ideally include:
+- backend selection via config
+- reproducible ingest or clearly documented reuse mode
+- successful RAG predictions via pgvector retriever
+- MLflow evaluation working unchanged at the orchestration layer
+- README coverage of Postgres/pgvector setup and required env vars

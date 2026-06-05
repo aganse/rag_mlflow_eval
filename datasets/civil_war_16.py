@@ -5,9 +5,6 @@ EvalRecord = dict[str, dict[str, str | list[str]]]
 
 def get_dataset_name() -> str:
     """Return the MLflow dataset name for the full evaluation set.
-
-    Returns:
-        The dataset name used when creating or retrieving the MLflow dataset.
     """
 
     return "usmilestonedocs_civilwar_all16"
@@ -15,9 +12,6 @@ def get_dataset_name() -> str:
 
 def get_url_listings() -> list[str]:
     """Return the source URLs used to build the full evaluation corpus.
-
-    Returns:
-        The ordered list of source document URLs for this dataset.
     """
 
     url_listings = [
@@ -43,9 +37,6 @@ def get_url_listings() -> list[str]:
 
 def get_eval_records() -> list[EvalRecord]:
     """Return evaluation records for the full Civil War document set.
-
-    Returns:
-        The evaluation records consumed by MLflow GenAI evaluation.
     """
 
     eval_records = [

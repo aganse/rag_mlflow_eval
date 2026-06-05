@@ -2,19 +2,22 @@
 
 from collections.abc import Callable
 
-
 import mlflow.pyfunc
-from mlflow.genai.scorers.base import Scorer
 from mlflow.genai.scorers import (
     Correctness,
     RelevanceToQuery,
-    RetrievalRelevance,
     RetrievalGroundedness,
+    RetrievalRelevance,
     RetrievalSufficiency,
 )
+from mlflow.genai.scorers.base import Scorer
 
 
-def evaluate_logged_rag_model(query: str, loaded_model: mlflow.pyfunc.PyFuncModel) -> str:
+
+def evaluate_logged_rag_model(
+    query: str,
+    loaded_model: mlflow.pyfunc.PyFuncModel,
+) -> str:
     """Run the logged model for a query and normalize the response to a string.
 
     Args:
@@ -27,7 +30,6 @@ def evaluate_logged_rag_model(query: str, loaded_model: mlflow.pyfunc.PyFuncMode
 
     pred = loaded_model.predict([{"query": query}])
 
-    # Normalize the model output into a plain string for the judges
     if isinstance(pred, list) and len(pred) > 0:
         first = pred[0]
         if isinstance(first, dict):
@@ -42,7 +44,10 @@ def evaluate_logged_rag_model(query: str, loaded_model: mlflow.pyfunc.PyFuncMode
     return str(pred)
 
 
-def make_predict_fn(loaded_model: mlflow.pyfunc.PyFuncModel) -> Callable[[str], str]:
+
+def make_predict_fn(
+    loaded_model: mlflow.pyfunc.PyFuncModel,
+) -> Callable[[str], str]:
     """Create the prediction callback expected by ``mlflow.genai.evaluate``.
 
     Args:
@@ -67,27 +72,39 @@ def make_predict_fn(loaded_model: mlflow.pyfunc.PyFuncModel) -> Callable[[str], 
     return predict_fn
 
 
-def get_scorers(use_retrieval_scorers: bool = False) -> list[Scorer]:
+
+def get_scorers(
+    use_retrieval_scorers: bool = False,
+    verbose: bool = False,
+) -> list[Scorer]:
     """Return the configured set of GenAI scorers.
 
     Args:
         use_retrieval_scorers: Whether to include retrieval-specific scorers.
+        verbose: Whether to print a concise scorer summary.
 
     Returns:
         The ordered list of scorers to pass to MLflow evaluation.
     """
 
-    scorers = [
+    selected_scorers = [
         Correctness(),
         RelevanceToQuery(),
     ]
 
     if use_retrieval_scorers:
-        scorers.extend([
-            RetrievalRelevance(),
-            RetrievalGroundedness(),
-            RetrievalSufficiency(),
-        ])
+        selected_scorers.extend(
+            [
+                RetrievalRelevance(),
+                RetrievalGroundedness(),
+                RetrievalSufficiency(),
+            ]
+        )
 
-    print("Scorers selected:", [type(s).__name__ for s in scorers])
-    return scorers
+    if verbose:
+        print(
+            "Scorers selected:",
+            [type(scorer).__name__ for scorer in selected_scorers],
+        )
+
+    return selected_scorers

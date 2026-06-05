@@ -4,8 +4,8 @@ from collections.abc import Sequence
 
 from bs4 import BeautifulSoup
 import faiss
-from langchain_core.documents import Document
 from langchain_community.vectorstores import FAISS
+from langchain_core.documents import Document
 from langchain_openai import OpenAIEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 import requests
@@ -25,20 +25,15 @@ def fetch_federal_document(url: str, div_class: str) -> str:
         The extracted transcript text, or an error message when retrieval fails.
     """
 
-    # Sending a request to the URL
-    response = requests.get(url)
+    response = requests.get(url, timeout=60)
     if response.status_code == 200:
-        # Parsing the HTML content of the page
         soup = BeautifulSoup(response.text, "html.parser")
+        transcript_section = soup.find("div", class_=div_class)
+        if transcript_section:
+            return transcript_section.get_text(separator="\n", strip=True)
+        return "Transcript section not found."
 
-        # Finding the transcript section by its HTML structure
-        if transcript_section := soup.find("div", class_=div_class):
-            transcript_text = transcript_section.get_text(separator="\n", strip=True)
-            return transcript_text
-        else:
-            return "Transcript section not found."
-    else:
-        return f"Failed to retrieve the webpage. Status code: {response.status_code}"
+    return f"Failed to retrieve the webpage. Status code: {response.status_code}"
 
 
 def fetch_documents(url_list: Sequence[str]) -> list[Document]:
@@ -66,16 +61,19 @@ def fetch_documents(url_list: Sequence[str]) -> list[Document]:
 def create_faiss_database(
     url_list: Sequence[str],
     database_save_directory: str,
-    chunk_size: int = 500,
-    chunk_overlap: int = 50,
+    chunk_size: int,
+    chunk_overlap: int,
+    verbose: bool = False,
 ) -> FAISS:
     """Create and persist a FAISS vector store from source URLs.
 
     Args:
         url_list: The source URLs to ingest.
-        database_save_directory: The local directory where the FAISS index is saved.
+        database_save_directory: The local directory where the FAISS index is
+            saved.
         chunk_size: The maximum chunk size used during splitting.
         chunk_overlap: The overlap between adjacent chunks.
+        verbose: Whether to print lightweight progress information.
 
     Returns:
         The populated FAISS vector store.
@@ -89,10 +87,14 @@ def create_faiss_database(
     )
     document_chunks = splitter.split_documents(raw_documents)
 
-    print("Raw documents:", len(raw_documents))
-    print("Chunks:", len(document_chunks))
-    print("Max chunk length:", max(len(d.page_content) for d in document_chunks))
-    print("First 3 chunk lengths:", [len(d.page_content) for d in document_chunks[:3]])
+    if verbose:
+        print(
+            "Built FAISS source chunks:",
+            f"raw_documents={len(raw_documents)}",
+            f"chunks={len(document_chunks)}",
+            f"chunk_size={chunk_size}",
+            f"chunk_overlap={chunk_overlap}",
+        )
 
     embedding_generator = OpenAIEmbeddings()
     faiss_database = FAISS.from_documents(document_chunks, embedding_generator)
