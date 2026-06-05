@@ -40,14 +40,19 @@ def fetch_webpage_contents(url: str, div_class: str | None = None) -> str:
             falls back to a more general main-content extraction strategy.
 
     Returns:
-        The extracted page text, or an error message when retrieval fails.
+        The extracted page text.
+
+    Raises:
+        RuntimeError: If the webpage cannot be retrieved.
     """
 
     try:
         response = requests.get(url, timeout=60)
         response.raise_for_status()
     except requests.RequestException as exc:
-        return f"Failed to retrieve the webpage: {exc}"
+        raise RuntimeError(
+            f"Failed to retrieve the webpage: {url}: {exc}"
+        ) from exc
 
     soup = BeautifulSoup(response.text, "html.parser")
 
@@ -99,25 +104,48 @@ def fetch_webpage_contents(url: str, div_class: str | None = None) -> str:
     return text or "No webpage text content found."
 
 
-def fetch_documents(url_list: Sequence[str]) -> list[Document]:
+def fetch_documents(
+    url_list: Sequence[str],
+    verbose: bool = False,
+) -> list[Document]:
     """Fetch source pages and wrap each one in a LangChain document.
 
     Args:
         url_list: The source URLs to retrieve.
+        verbose: Whether to print lightweight progress information.
 
     Returns:
         A list of documents with source metadata preserved.
+
+    Raises:
+        RuntimeError: If any source URL fails to fetch.
     """
 
     docs = []
+    failed_urls = []
     for url in url_list:
-        text = fetch_webpage_contents(url)
+        try:
+            text = fetch_webpage_contents(url)
+        except RuntimeError:
+            failed_urls.append(url)
+            continue
         docs.append(
             Document(
                 page_content=text,
                 metadata={"source": url},
             )
         )
+
+    if failed_urls:
+        failed_list = ", ".join(failed_urls)
+        raise RuntimeError(
+            "One or more source documents failed to fetch: "
+            f"{failed_list}"
+        )
+
+    if verbose:
+        print(f"Fetched source documents successfully: {len(docs)}")
+
     return docs
 
 
@@ -144,7 +172,7 @@ def create_faiss_database(
         The populated FAISS vector store.
     """
 
-    raw_documents = fetch_documents(url_list)
+    raw_documents = fetch_documents(url_list, verbose=verbose)
 
     splitter = RecursiveCharacterTextSplitter(
         chunk_size=chunk_size,
