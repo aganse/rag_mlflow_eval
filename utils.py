@@ -15,6 +15,21 @@ import requests
 faiss.omp_set_num_threads(1)
 
 
+def build_embeddings(embedding_model: str | None = None) -> OpenAIEmbeddings:
+    """Return the configured embedding generator.
+
+    Args:
+        embedding_model: Optional embedding model override.
+
+    Returns:
+        The OpenAI embeddings client, using LangChain defaults when omitted.
+    """
+
+    if embedding_model is None:
+        return OpenAIEmbeddings()
+    return OpenAIEmbeddings(model=embedding_model)
+
+
 def fetch_webpage_contents(url: str, div_class: str | None = None) -> str:
     """Fetch the main text content from a webpage.
 
@@ -111,6 +126,7 @@ def create_faiss_database(
     database_save_directory: str,
     chunk_size: int,
     chunk_overlap: int,
+    embedding_model: str | None = None,
     verbose: bool = False,
 ) -> FAISS:
     """Create and persist a FAISS vector store from source URLs.
@@ -121,6 +137,7 @@ def create_faiss_database(
             saved.
         chunk_size: The maximum chunk size used during splitting.
         chunk_overlap: The overlap between adjacent chunks.
+        embedding_model: Optional embedding model override.
         verbose: Whether to print lightweight progress information.
 
     Returns:
@@ -144,7 +161,7 @@ def create_faiss_database(
             f"chunk_overlap={chunk_overlap}",
         )
 
-    embedding_generator = OpenAIEmbeddings()
+    embedding_generator = build_embeddings(embedding_model)
     faiss_database = FAISS.from_documents(document_chunks, embedding_generator)
     faiss_database.save_local(database_save_directory)
 

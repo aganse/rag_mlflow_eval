@@ -4,7 +4,8 @@ from pathlib import Path
 from typing import Any
 
 from langchain_community.vectorstores import FAISS
-from langchain_openai import OpenAIEmbeddings
+
+from utils import build_embeddings
 
 
 def get_faiss_persist_dir() -> Path:
@@ -36,11 +37,15 @@ def get_faiss_persist_dir() -> Path:
     return persist_dir
 
 
-def get_retriever(retrieval_top_k: int) -> Any:
+def get_retriever(
+    retrieval_top_k: int,
+    embedding_model: str | None = None,
+) -> Any:
     """Load the packaged FAISS vector store and return a retriever.
 
     Args:
         retrieval_top_k: The number of chunks to retrieve per query.
+        embedding_model: Optional embedding model override.
 
     Returns:
         A retriever configured with the requested top-k setting.
@@ -48,7 +53,7 @@ def get_retriever(retrieval_top_k: int) -> Any:
 
     vector_db = FAISS.load_local(
         get_faiss_persist_dir().as_posix(),
-        OpenAIEmbeddings(),
+        build_embeddings(embedding_model),
         allow_dangerous_deserialization=True,
     )
     return vector_db.as_retriever(search_kwargs={"k": retrieval_top_k})

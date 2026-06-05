@@ -19,7 +19,7 @@ def get_url_listings() -> list[str]:
     """
 
     url_listings = [
-        "https://fireflyspace.com/missions/blue-ghost-mission-1"
+        "https://fireflyspace.com/missions/blue-ghost-mission-1",
         "https://www.astrobotic.com/astrobotics-peregrine-launches-to-the-moon",
         "https://www.astrobotic.com/update-4-for-peregrine-mission-one",
         "https://www.astrobotic.com/update-17-for-peregrine-mission-one",

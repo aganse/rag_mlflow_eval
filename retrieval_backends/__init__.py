@@ -13,12 +13,17 @@ def get_supported_retrieval_backends() -> tuple[str, ...]:
     return SUPPORTED_RETRIEVAL_BACKENDS
 
 
-def get_retriever(backend_name: str, retrieval_top_k: int) -> Any:
+def get_retriever(
+    backend_name: str,
+    retrieval_top_k: int,
+    embedding_model: str | None = None,
+) -> Any:
     """Build and return a retriever for the requested backend.
 
     Args:
         backend_name: The configured retrieval backend short name.
         retrieval_top_k: The number of chunks to retrieve per query.
+        embedding_model: Optional embedding model override.
 
     Returns:
         The backend-specific retriever object.
@@ -28,7 +33,7 @@ def get_retriever(backend_name: str, retrieval_top_k: int) -> Any:
     """
 
     if backend_name == "faiss":
-        return faiss_backend.get_retriever(retrieval_top_k)
+        return faiss_backend.get_retriever(retrieval_top_k, embedding_model)
 
     available_backends = ", ".join(get_supported_retrieval_backends())
     raise ValueError(

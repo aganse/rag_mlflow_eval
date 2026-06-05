@@ -75,6 +75,7 @@ params = {
     "retrieval_backend": "faiss", # future-ready; only "faiss" today
     "dataset": "testA",           # "testA" | "civil_war_16"
     "base_llm": "gpt-4.1-mini",
+    "embedding_model": "",        # "" -> use LangChain/OpenAI default
     "judge_llm": "",             # "" -> use MLflow default judge model
     "chunk_size": 500,
     "chunk_overlap": 50,
@@ -100,6 +101,10 @@ params = {
     `get_dataset_name()`.
 - `base_llm`
   - Controls the answering model used in both `rag` and `no_rag` modes.
+- `embedding_model`
+  - Controls the OpenAI embedding model used to build and query the FAISS
+    index in `rag` mode.
+  - Use `""` (or omit the key) to fall back to the current LangChain default.
 - `judge_llm`
   - Controls the MLflow LLM-as-a-judge model used by the evaluation scorers.
   - Use `""` (or omit the key) to fall back to MLflow's default judge model.
@@ -213,7 +218,8 @@ for that later addition are captured in `notes.pgvector.backend.txt`.
 
 - switch between `rag` and `no_rag`
 - switch datasets by changing `params["dataset"]`
-- adjust `base_llm`, `judge_llm`, `chunk_size`, `chunk_overlap`, or `retrieval_top_k`
+- adjust `base_llm`, `embedding_model`, `judge_llm`, `chunk_size`,
+  `chunk_overlap`, or `retrieval_top_k`
 - re-run `python main.py`
 - inspect traces, datasets, logged models, eval runs, eval results, and logged
   params in MLflow

@@ -84,6 +84,7 @@ def build_rag_model(
     retrieval_backend: str,
     base_llm: str,
     retrieval_top_k: int,
+    embedding_model: str | None = None,
 ) -> Any:
     """Build the retrieval-augmented QA model.
 
@@ -91,12 +92,17 @@ def build_rag_model(
         retrieval_backend: The retrieval backend short name.
         base_llm: The OpenAI chat model name used for answer generation.
         retrieval_top_k: The number of retrieved chunks to supply to the model.
+        embedding_model: Optional embedding model override.
 
     Returns:
         The runnable LangChain model used for RAG predictions.
     """
 
-    retriever = get_retriever(retrieval_backend, retrieval_top_k)
+    retriever = get_retriever(
+        retrieval_backend,
+        retrieval_top_k,
+        embedding_model,
+    )
     prompt = ChatPromptTemplate.from_messages(
         [
             ("system", _RAG_SYSTEM_PROMPT),

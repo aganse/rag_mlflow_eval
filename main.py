@@ -35,8 +35,9 @@ params = {
     "verbose": False,
     "retrieval_backend": "faiss",
     "dataset": "testB",
-    "base_llm": "gpt-4o-mini",
-    "judge_llm": "",
+    "base_llm": "gpt-4o-mini",  # the arbitrary model the RAG is built around
+    "embedding_model": "text-embedding-ada-002",  # langchain default, "text-embedding-3-small" as possible good alternate
+    "judge_llm": "openai:/gpt-4o-mini",  # mlflow default, note "openai:/" needed
     "chunk_size": 500,
     "chunk_overlap": 50,
     "retrieval_top_k": 4,
@@ -125,6 +126,7 @@ def validate_params(config: dict[str, Any]) -> None:
     if not isinstance(base_llm, str) or not base_llm.strip():
         raise ValueError("'base_llm' must be a non-empty string.")
 
+    normalize_optional_string(config.get("embedding_model"), "embedding_model")
     judge_llm = normalize_optional_string(config.get("judge_llm"), "judge_llm")
     if judge_llm is not None and ":/" not in judge_llm:
         raise ValueError(
@@ -193,6 +195,8 @@ def write_logged_model_config(config: dict[str, Any]) -> None:
         '"""Runtime configuration packaged with the logged MLflow model."""',
         "",
         f"BASE_LLM = {config['base_llm']!r}",
+        "EMBEDDING_MODEL = "
+        f"{normalize_optional_string(config.get('embedding_model'), 'embedding_model')!r}",
         f"RETRIEVAL_BACKEND = {config['retrieval_backend']!r}",
         f"RETRIEVAL_TOP_K = {config['retrieval_top_k']!r}",
     ]
@@ -206,6 +210,7 @@ def prepare_faiss_index(
     url_listings: list[str],
     chunk_size: int,
     chunk_overlap: int,
+    embedding_model: str | None,
     verbose: bool,
 ) -> None:
     """Build the FAISS index locally so it can be packaged with the model.
@@ -214,6 +219,7 @@ def prepare_faiss_index(
         url_listings: The source URLs used to populate the vector store.
         chunk_size: The maximum chunk size used during splitting.
         chunk_overlap: The overlap between adjacent chunks.
+        embedding_model: Optional embedding model override for FAISS vectors.
         verbose: Whether to print lightweight progress information.
     """
 
@@ -226,6 +232,7 @@ def prepare_faiss_index(
             persist_dir.as_posix(),
             chunk_size=chunk_size,
             chunk_overlap=chunk_overlap,
+            embedding_model=embedding_model,
             verbose=verbose,
         )
 
@@ -258,6 +265,10 @@ def prepare_retrieval_artifacts(
             url_listings,
             chunk_size=config["chunk_size"],
             chunk_overlap=config["chunk_overlap"],
+            embedding_model=normalize_optional_string(
+                config.get("embedding_model"),
+                "embedding_model",
+            ),
             verbose=config["verbose"],
         )
         return
@@ -332,6 +343,11 @@ def log_workflow_params(
         "dataset_name": dataset_name,
         "model_name": model_name,
         "base_llm": str(config["base_llm"]),
+        "embedding_model": normalize_optional_string(
+            config.get("embedding_model"),
+            "embedding_model",
+        )
+        or "",
         "judge_llm": normalize_optional_string(
             config.get("judge_llm"),
             "judge_llm",
@@ -352,6 +368,10 @@ def main() -> None:
     """Run the configured MLflow QA evaluation workflow."""
 
     validate_params(params)
+    embedding_model = normalize_optional_string(
+        params.get("embedding_model"),
+        "embedding_model",
+    )
     judge_llm = normalize_optional_string(params.get("judge_llm"), "judge_llm")
 
     if "OPENAI_API_KEY" not in os.environ:
@@ -379,6 +399,7 @@ def main() -> None:
             f"dataset={params['dataset']}, "
             f"retrieval_backend={params['retrieval_backend']}, "
             f"base_llm={params['base_llm']}, "
+            f"embedding_model={embedding_model or 'langchain-default'}, "
             f"judge_llm={judge_llm or 'mlflow-default'}"
         ),
         params["verbose"],
