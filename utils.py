@@ -1,6 +1,7 @@
 """Utility helpers for fetching source documents and building the FAISS store."""
 
 from collections.abc import Sequence
+import re
 
 from bs4 import BeautifulSoup
 import faiss
@@ -14,26 +15,73 @@ import requests
 faiss.omp_set_num_threads(1)
 
 
-def fetch_federal_document(url: str, div_class: str) -> str:
-    """Fetch the transcript text for a U.S. Milestones document page.
+def fetch_webpage_contents(url: str, div_class: str | None = None) -> str:
+    """Fetch the main text content from a webpage.
 
     Args:
-        url: The Archives.gov page to scrape.
-        div_class: The HTML class containing the transcript content.
+        url: The webpage URL to scrape.
+        div_class: Optional HTML class to prefer when extracting content.
+            This is kept for backward compatibility, but the function now
+            falls back to a more general main-content extraction strategy.
 
     Returns:
-        The extracted transcript text, or an error message when retrieval fails.
+        The extracted page text, or an error message when retrieval fails.
     """
 
-    response = requests.get(url, timeout=60)
-    if response.status_code == 200:
-        soup = BeautifulSoup(response.text, "html.parser")
-        transcript_section = soup.find("div", class_=div_class)
-        if transcript_section:
-            return transcript_section.get_text(separator="\n", strip=True)
-        return "Transcript section not found."
+    try:
+        response = requests.get(url, timeout=60)
+        response.raise_for_status()
+    except requests.RequestException as exc:
+        return f"Failed to retrieve the webpage: {exc}"
 
-    return f"Failed to retrieve the webpage. Status code: {response.status_code}"
+    soup = BeautifulSoup(response.text, "html.parser")
+
+    for tag_name in [
+        "script",
+        "style",
+        "noscript",
+        "header",
+        "footer",
+        "nav",
+        "aside",
+        "form",
+        "svg",
+    ]:
+        for tag in soup.find_all(tag_name):
+            tag.decompose()
+
+    candidate_sections = []
+
+    if div_class:
+        preferred_section = soup.find(class_=div_class)
+        if preferred_section:
+            candidate_sections.append(preferred_section)
+
+    for selector in [
+        "main",
+        "article",
+        "[role='main']",
+        "section",
+        "div[id*='content']",
+        "div[class*='content']",
+        "div[id*='main']",
+        "div[class*='main']",
+    ]:
+        candidate_sections.extend(soup.select(selector))
+
+    if soup.body:
+        candidate_sections.append(soup.body)
+    else:
+        candidate_sections.append(soup)
+
+    best_section = max(
+        candidate_sections,
+        key=lambda tag: len(tag.get_text(" ", strip=True)),
+    )
+    text = best_section.get_text(separator="\n", strip=True)
+    text = re.sub(r"\n{3,}", "\n\n", text)
+
+    return text or "No webpage text content found."
 
 
 def fetch_documents(url_list: Sequence[str]) -> list[Document]:
@@ -48,7 +96,7 @@ def fetch_documents(url_list: Sequence[str]) -> list[Document]:
 
     docs = []
     for url in url_list:
-        text = fetch_federal_document(url, "col-sm-9")
+        text = fetch_webpage_contents(url)
         docs.append(
             Document(
                 page_content=text,

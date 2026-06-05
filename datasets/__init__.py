@@ -2,7 +2,7 @@
 
 from typing import Protocol
 
-from . import civil_war_16, testA
+from . import civil_war_16, testA, testB
 
 EvalRecord = dict[str, dict[str, str | list[str]]]
 
@@ -25,6 +25,7 @@ class DatasetModule(Protocol):
 
 DATASET_REGISTRY: dict[str, DatasetModule] = {
     "testA": testA,
+    "testB": testB,
     "civil_war_16": civil_war_16,
 }
 

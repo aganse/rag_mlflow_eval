@@ -26,7 +26,7 @@ def run_smoke_test(
         RuntimeError: If no traces are available after invoking the model.
     """
 
-    smoke_test_query = "Which amendment involves birthright citizenship?"
+    smoke_test_query = "2. Who is the latest current US president as of what date?"
 
     _ = loaded_model.predict([{"query": smoke_test_query}])
 

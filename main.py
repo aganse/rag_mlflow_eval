@@ -34,8 +34,8 @@ params = {
     "mode": "rag",
     "verbose": False,
     "retrieval_backend": "faiss",
-    "dataset": "testA",
-    "base_llm": "gpt-4.1-mini",
+    "dataset": "testB",
+    "base_llm": "gpt-4o-mini",
     "judge_llm": "",
     "chunk_size": 500,
     "chunk_overlap": 50,
@@ -415,7 +415,7 @@ def main() -> None:
         loaded_model = mlflow.pyfunc.load_model(model_info.model_uri)
 
         sample_question = (
-            "What amendment addresses protections on the right to vote?"
+            "1. What is your knowledge cutoff date in your training data?"
         )
         sample_answer = loaded_model.predict([{"query": sample_question}])
         if params["verbose"]:
