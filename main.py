@@ -36,12 +36,37 @@ params = {
     "retrieval_backend": "faiss",
     "dataset": "testA",
     "base_llm": "gpt-4.1-mini",
+    "judge_llm": "",
     "chunk_size": 500,
     "chunk_overlap": 50,
     "retrieval_top_k": 4,
 }
 
 _VALID_MODES = ("rag", "no_rag")
+
+
+
+def normalize_optional_string(value: Any, field_name: str) -> str | None:
+    """Return a stripped string value, or ``None`` when blank or missing.
+
+    Args:
+        value: The raw config value to normalize.
+        field_name: The config field name used in validation errors.
+
+    Returns:
+        The stripped string value, or ``None`` if the input is ``None`` or blank.
+
+    Raises:
+        ValueError: If the value is not a string-like optional field.
+    """
+
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ValueError(f"'{field_name}' must be a string when provided.")
+
+    normalized = value.strip()
+    return normalized or None
 
 
 
@@ -99,6 +124,13 @@ def validate_params(config: dict[str, Any]) -> None:
     base_llm = config["base_llm"]
     if not isinstance(base_llm, str) or not base_llm.strip():
         raise ValueError("'base_llm' must be a non-empty string.")
+
+    judge_llm = normalize_optional_string(config.get("judge_llm"), "judge_llm")
+    if judge_llm is not None and ":/" not in judge_llm:
+        raise ValueError(
+            "'judge_llm' must be empty/missing or use MLflow judge model "
+            "format like 'openai:/gpt-4o-mini'."
+        )
 
     validate_positive_int(config["chunk_size"], "chunk_size")
     validate_non_negative_int(config["chunk_overlap"], "chunk_overlap")
@@ -300,6 +332,11 @@ def log_workflow_params(
         "dataset_name": dataset_name,
         "model_name": model_name,
         "base_llm": str(config["base_llm"]),
+        "judge_llm": normalize_optional_string(
+            config.get("judge_llm"),
+            "judge_llm",
+        )
+        or "",
         "chunk_size": str(config["chunk_size"]),
         "chunk_overlap": str(config["chunk_overlap"]),
         "retrieval_top_k": str(config["retrieval_top_k"]),
@@ -315,6 +352,7 @@ def main() -> None:
     """Run the configured MLflow QA evaluation workflow."""
 
     validate_params(params)
+    judge_llm = normalize_optional_string(params.get("judge_llm"), "judge_llm")
 
     if "OPENAI_API_KEY" not in os.environ:
         raise RuntimeError(
@@ -340,7 +378,8 @@ def main() -> None:
             f"mode={params['mode']}, "
             f"dataset={params['dataset']}, "
             f"retrieval_backend={params['retrieval_backend']}, "
-            f"base_llm={params['base_llm']}"
+            f"base_llm={params['base_llm']}, "
+            f"judge_llm={judge_llm or 'mlflow-default'}"
         ),
         params["verbose"],
     )
@@ -451,6 +490,7 @@ def main() -> None:
             predict_fn=scorers.make_predict_fn(loaded_model),
             scorers=scorers.get_scorers(
                 use_retrieval_scorers,
+                judge_llm=judge_llm,
                 verbose=params["verbose"],
             ),
             model_id=model_info.model_id,

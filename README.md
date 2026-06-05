@@ -75,6 +75,7 @@ params = {
     "retrieval_backend": "faiss", # future-ready; only "faiss" today
     "dataset": "testA",           # "testA" | "civil_war_16"
     "base_llm": "gpt-4.1-mini",
+    "judge_llm": "",             # "" -> use MLflow default judge model
     "chunk_size": 500,
     "chunk_overlap": 50,
     "retrieval_top_k": 4,
@@ -99,8 +100,10 @@ params = {
     `get_dataset_name()`.
 - `base_llm`
   - Controls the answering model used in both `rag` and `no_rag` modes.
-  - It does not configure the separate LLM-judge model used internally by
-    MLflow evaluation scorers.
+- `judge_llm`
+  - Controls the MLflow LLM-as-a-judge model used by the evaluation scorers.
+  - Use `""` (or omit the key) to fall back to MLflow's default judge model.
+  - When set, use MLflow judge model format such as `openai:/gpt-4o-mini`.
 - `chunk_size`, `chunk_overlap`, `retrieval_top_k`
   - These are validated and logged on every run.
   - They are only used when `mode == "rag"`.
@@ -115,8 +118,8 @@ The evaluation run name is also created automatically, using a baseline label:
 - `eval_qa_rag_faiss_testA_baseline`
 - `eval_qa_no_rag_testA_baseline`
 
-Detailed settings such as `base_llm`, chunking, and retrieval top-k are logged
-as MLflow params instead of being embedded in the model name.
+Detailed settings such as `base_llm`, `judge_llm`, chunking, and retrieval top-k
+are logged as MLflow params instead of being embedded in the model name.
 
 ## Run
 
@@ -210,7 +213,7 @@ for that later addition are captured in `notes.pgvector.backend.txt`.
 
 - switch between `rag` and `no_rag`
 - switch datasets by changing `params["dataset"]`
-- adjust `base_llm`, `chunk_size`, `chunk_overlap`, or `retrieval_top_k`
+- adjust `base_llm`, `judge_llm`, `chunk_size`, `chunk_overlap`, or `retrieval_top_k`
 - re-run `python main.py`
 - inspect traces, datasets, logged models, eval runs, eval results, and logged
   params in MLflow

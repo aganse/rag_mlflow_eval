@@ -75,12 +75,14 @@ def make_predict_fn(
 
 def get_scorers(
     use_retrieval_scorers: bool = False,
+    judge_llm: str | None = None,
     verbose: bool = False,
 ) -> list[Scorer]:
     """Return the configured set of GenAI scorers.
 
     Args:
         use_retrieval_scorers: Whether to include retrieval-specific scorers.
+        judge_llm: Optional MLflow judge model override for LLM scorers.
         verbose: Whether to print a concise scorer summary.
 
     Returns:
@@ -88,16 +90,16 @@ def get_scorers(
     """
 
     selected_scorers = [
-        Correctness(),
-        RelevanceToQuery(),
+        Correctness(model=judge_llm),
+        RelevanceToQuery(model=judge_llm),
     ]
 
     if use_retrieval_scorers:
         selected_scorers.extend(
             [
-                RetrievalRelevance(),
-                RetrievalGroundedness(),
-                RetrievalSufficiency(),
+                RetrievalRelevance(model=judge_llm),
+                RetrievalGroundedness(model=judge_llm),
+                RetrievalSufficiency(model=judge_llm),
             ]
         )
 
