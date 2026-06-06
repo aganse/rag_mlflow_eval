@@ -14,6 +14,13 @@ import requests
 ### only necessary for MacOS:
 faiss.omp_set_num_threads(1)
 
+DEFAULT_REQUEST_HEADERS = {
+    "User-Agent": (
+        "rag-mlflow-eval/0.1 "
+        "(research retrieval experiments; contact: replace-with-your-email)"
+    ),
+}
+
 
 def build_embeddings(embedding_model: str | None = None) -> OpenAIEmbeddings:
     """Return the configured embedding generator.
@@ -47,7 +54,11 @@ def fetch_webpage_contents(url: str, div_class: str | None = None) -> str:
     """
 
     try:
-        response = requests.get(url, timeout=60)
+        response = requests.get(
+            url,
+            timeout=60,
+            headers=DEFAULT_REQUEST_HEADERS,
+        )
         response.raise_for_status()
     except requests.RequestException as exc:
         raise RuntimeError(

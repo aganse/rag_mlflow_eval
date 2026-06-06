@@ -29,18 +29,18 @@ import smoke_test
 import utils
 
 params = {
-    "experiment_name": "History docs RAG",
+    "experiment_name": "Space News RAG",
     "mlflow_tracking_uri": "http://localhost:5000",
-    "mode": "rag",
+    "mode": "no_rag",
     "verbose": False,
     "retrieval_backend": "faiss",
-    "dataset": "testB",
-    "base_llm": "gpt-4o-mini",  # the arbitrary model the RAG is built around
-    "embedding_model": "text-embedding-3-small",  # "text-embedding-3-small", "text-embedding-ada-002"(langchain default)
-    "judge_llm": "openai:/gpt-4o-mini",  # mlflow default, note "openai:/" needed
+    "dataset": "space_news",
     "chunk_size": 500,
     "chunk_overlap": 50,
-    "retrieval_top_k": 4,
+    "retrieval_top_k": 5,
+    "embedding_model": "text-embedding-3-small",
+    "base_llm": "gpt-4o-mini",
+    "judge_llm": "openai:/gpt-4o-mini",
 }
 
 _VALID_MODES = ("rag", "no_rag")

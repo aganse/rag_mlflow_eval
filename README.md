@@ -1,18 +1,24 @@
 # rag_mlflow_eval
 
-A small example project that evaluates question-answering behavior with MLflow,
+An example project that evaluates question-answering (QA) behavior with MLflow,
 including both a retrieval-augmented generation (RAG) mode and a no-RAG
 baseline mode for performance comparison.
 
-The default corpus is a set of U.S. National Archives milestone documents defined
-by the URLs in the modules in datasets/ and pointed to by the "dataset" parameter,
-then scraped from those webpages at runtime.
+The default corpus is a set of space-related news items that happened in
+2024-2026, ie after the knowledge cutoff of OpenAI's gpt-4o-mini LLM model
+which is used as the core of the RAG model, so that we can check the drop
+in correctness when turning off the RAG and letting the model hallucinate
+answers to events that occurred more recently than its training data.
+
+Note to MLflow a "dataset" is just the set of test input queries and their
+expected answers, but the dataset modules in this repo additionally contain
+the list of URLs of associated documents to use for the RAG.
 
 
 ## What this repo does
 
 - loads an evaluation dataset definition from `datasets/`
-- optionally scrapes source documents from Archives.gov
+- optionally scrapes source documents from webpages listed with dataset
 - optionally chunks and embeds them with OpenAI embeddings
 - optionally stores the chunks in a local FAISS index
 - builds either a RAG chain or a no-RAG QA chain
@@ -28,12 +34,12 @@ then scraped from those webpages at runtime.
 - `retriever_chain.py` — logged MLflow wrapper for RAG mode
 - `no_rag_chain.py` — logged MLflow wrapper for no-RAG mode
 - `logged_model_config.py` — packaged runtime config for the logged model
-- `retrieval_backends/` — retrieval backend helpers (`faiss` today)
+- `retrieval_backends/` — retrieval backend helpers (only `faiss` today)
 - `datasets/` — dataset registry plus individual dataset definition files
 - `utils.py` — document fetching, chunking, and FAISS creation
 - `scorers.py` — prediction wrapper and MLflow scorer selection
 - `smoke_test.py` — retriever-trace check for retrieval scorers in RAG mode
-- `faiss_index/` — persisted vector index copied into the repo for packaging
+- `faiss_index/` — persisted vector index generated in run (not in git repo)
 - `notes.pgvector.backend.txt` — notes for a future pgvector backend option
 
 ## Requirements
@@ -56,7 +62,7 @@ Set your API key:
 export OPENAI_API_KEY=your_key_here
 ```
 
-Start MLflow locally in another terminal (or of course you can use an existing one):
+Start MLflow locally in another terminal if you don't already have one running:
 
 ```bash
 mlflow server --host 127.0.0.1 --port 5000
@@ -68,18 +74,18 @@ Edit the `params` dictionary near the top of `main.py`:
 
 ```python
 params = {
-    "experiment_name": "History docs RAG",
+    "experiment_name": "Space News RAG",
     "mlflow_tracking_uri": "http://localhost:5000",
-    "mode": "rag",                # "rag" | "no_rag"
+    "mode": "rag",                                # "rag" or "no_rag"
     "verbose": False,
-    "retrieval_backend": "faiss", # future-ready; only "faiss" today
-    "dataset": "testA",           # "testA" | "civil_war_16"
-    "base_llm": "gpt-4.1-mini",
-    "embedding_model": "",        # "" -> use LangChain/OpenAI default
-    "judge_llm": "",             # "" -> use MLflow default judge model
+    "retrieval_backend": "faiss",                 # (for now the only choice)
+    "dataset": "space_news_2024_2026",            # as configured in datasets dir
     "chunk_size": 500,
     "chunk_overlap": 50,
-    "retrieval_top_k": 4,
+    "retrieval_top_k": 5,
+    "embedding_model": "text-embedding-3-small",  # langchain default is "text-embedding-ada-002"
+    "base_llm": "gpt-4o-mini",                    # the arbitrary model the RAG is built around
+    "judge_llm": "openai:/gpt-4o-mini",           # mlflow default, note "openai:/" is required
 }
 ```
 
@@ -190,6 +196,10 @@ Datasets live in the `datasets/` package.
   - module: `datasets/civil_war_16.py`
   - current long MLflow dataset name:
     `usmilestonedocs_civilwar_all16`
+- `space_news_2024_2026`
+  - module: `datasets/space_news_2024_2026.py`
+  - current long MLflow dataset name:
+    `space_news_2024_2026`
 
 To add another dataset later:
 
@@ -215,8 +225,8 @@ for that later addition are captured in `notes.pgvector.backend.txt`.
 - `retriever_chain.py` expects a packaged `faiss_index/` directory when running
   in RAG mode.
 - The current prompts are intentionally simple and keep answers short.
-- Source pages are scraped live from Archives.gov, so external site changes may
-  affect retrieval quality.
+- Source pages are scraped live from webpages (esp news and wikipedia); note
+  external site changes may affect retrieval quality.
 
 ## Typical workflow for experimentation
 

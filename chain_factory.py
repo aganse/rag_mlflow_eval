@@ -14,6 +14,7 @@ from retrieval_backends import get_retriever
 
 _RAG_SYSTEM_PROMPT = (
     "Use the given context to answer the question. "
+    "Ignore any full sentences that are not in English. "
     "If you don't know the answer, say you don't know. "
     "Use three sentence maximum and keep the answer concise. "
     "Context: {context}"
