@@ -31,8 +31,8 @@ import utils
 params = {
     "experiment_name": "Space News RAG",
     "mlflow_tracking_uri": "http://localhost:5000",
-    "mode": "no_rag",
-    "verbose": False,
+    "mode": "rag",
+    "verbose": True,
     "retrieval_backend": "faiss",
     "dataset": "space_news",
     "chunk_size": 500,
@@ -44,7 +44,20 @@ params = {
 }
 
 _VALID_MODES = ("rag", "no_rag")
-
+_RAG_SYSTEM_PROMPT_NAME = "rag-system-prompt"
+_NO_RAG_SYSTEM_PROMPT_NAME = "no-rag-system-prompt"
+_RAG_SYSTEM_PROMPT_SEED_TEMPLATE = (
+    "Use the given context to answer the question. "
+    "If you don't know the answer, say you don't know. "
+    "Ignore any sequences of bibliographic text, text associated with menus and layout rather than content, and sentences that are not in English. "
+    "Use three sentence maximum and keep the answer concise. "
+    "Context: {{context}}"
+)
+_NO_RAG_SYSTEM_PROMPT_SEED_TEMPLATE = (
+    "Answer the question to the best of your ability. "
+    "If you don't know the answer, say you don't know. "
+    "Use three sentence maximum and keep the answer concise."
+)
 
 
 def normalize_optional_string(value: Any, field_name: str) -> str | None:
@@ -184,11 +197,97 @@ def build_model_name(config: dict[str, Any]) -> str:
 
 
 
-def write_logged_model_config(config: dict[str, Any]) -> None:
+def ensure_prompt_registered(
+    prompt_name: str,
+    seed_template: str,
+    verbose: bool,
+):
+    """Ensure the named MLflow prompt exists, creating version 1 if missing.
+
+    Args:
+        prompt_name: The MLflow prompt registry name to check.
+        seed_template: The initial prompt template to register when missing.
+        verbose: Whether to print lightweight progress information.
+
+    Returns:
+        The existing or newly created latest prompt version.
+    """
+
+    prompt = mlflow.genai.load_prompt(
+        prompt_name,
+        allow_missing=True,
+        link_to_model=False,
+    )
+    if prompt is not None:
+        print_status(
+            f"Using existing prompt registry entry: {prompt_name}",
+            verbose,
+        )
+        return prompt
+
+    print_status(
+        f"Registering initial prompt version for: {prompt_name}",
+        verbose,
+    )
+    return mlflow.genai.register_prompt(
+        name=prompt_name,
+        template=seed_template,
+        commit_message="Bootstrap initial prompt version from local seed.",
+    )
+
+
+
+def resolve_active_system_prompt(config: dict[str, Any]) -> dict[str, str]:
+    """Resolve the active system prompt metadata and baked template text.
+
+    Args:
+        config: The validated runtime configuration.
+
+    Returns:
+        A dictionary containing the active prompt name, version, URI, and
+        single-brace template text for LangChain.
+
+    Raises:
+        RuntimeError: If the active prompt is not a text prompt.
+    """
+
+    if config["mode"] == "rag":
+        prompt_name = _RAG_SYSTEM_PROMPT_NAME
+        seed_template = _RAG_SYSTEM_PROMPT_SEED_TEMPLATE
+    else:
+        prompt_name = _NO_RAG_SYSTEM_PROMPT_NAME
+        seed_template = _NO_RAG_SYSTEM_PROMPT_SEED_TEMPLATE
+
+    prompt = ensure_prompt_registered(
+        prompt_name,
+        seed_template,
+        verbose=config["verbose"],
+    )
+    if not prompt.is_text_prompt:
+        raise RuntimeError(
+            "Expected a text prompt for "
+            f"'{prompt_name}', but found a chat-style prompt."
+        )
+
+    prompt_version = str(prompt.version)
+    return {
+        "name": prompt.name,
+        "version": prompt_version,
+        "uri": f"prompts:/{prompt.name}/{prompt_version}",
+        "template": str(prompt.to_single_brace_format()),
+    }
+
+
+
+def write_logged_model_config(
+    config: dict[str, Any],
+    active_system_prompt: dict[str, str],
+) -> None:
     """Write the runtime config module packaged with the logged model.
 
     Args:
         config: The validated runtime configuration.
+        active_system_prompt: The resolved prompt metadata and baked template.
     """
 
     config_lines = [
@@ -199,6 +298,11 @@ def write_logged_model_config(config: dict[str, Any]) -> None:
         f"{normalize_optional_string(config.get('embedding_model'), 'embedding_model')!r}",
         f"RETRIEVAL_BACKEND = {config['retrieval_backend']!r}",
         f"RETRIEVAL_TOP_K = {config['retrieval_top_k']!r}",
+        f"ACTIVE_SYSTEM_PROMPT_NAME = {active_system_prompt['name']!r}",
+        f"ACTIVE_SYSTEM_PROMPT_VERSION = {active_system_prompt['version']!r}",
+        f"ACTIVE_SYSTEM_PROMPT_URI = {active_system_prompt['uri']!r}",
+        "ACTIVE_SYSTEM_PROMPT_TEMPLATE = "
+        f"{active_system_prompt['template']!r}",
     ]
     Path("logged_model_config.py").write_text(
         "\n".join(config_lines) + "\n"
@@ -322,6 +426,7 @@ def log_workflow_params(
     config: dict[str, Any],
     dataset_name: str,
     model_name: str,
+    active_system_prompt: dict[str, str],
     evaluation_label: str | None = None,
 ) -> None:
     """Log workflow parameters to the active MLflow run.
@@ -330,6 +435,7 @@ def log_workflow_params(
         config: The validated runtime configuration.
         dataset_name: The long-form dataset name used for MLflow datasets.
         model_name: The model name used for MLflow logging.
+        active_system_prompt: The resolved active prompt metadata.
         evaluation_label: Optional label describing the evaluation purpose.
     """
 
@@ -357,6 +463,9 @@ def log_workflow_params(
         "chunk_overlap": str(config["chunk_overlap"]),
         "retrieval_top_k": str(config["retrieval_top_k"]),
         "enable_retrieval_eval": str(config["mode"] == "rag"),
+        "system_prompt_name": active_system_prompt["name"],
+        "system_prompt_version": active_system_prompt["version"],
+        "system_prompt_uri": active_system_prompt["uri"],
     }
     if evaluation_label is not None:
         logged_params["evaluation_label"] = evaluation_label
@@ -391,6 +500,7 @@ def main() -> None:
     mlflow.set_experiment(params["experiment_name"])
     mlflow.langchain.autolog()
     mlflow.tracing.disable_notebook_display()
+    active_system_prompt = resolve_active_system_prompt(params)
 
     print_status(
         (
@@ -400,7 +510,8 @@ def main() -> None:
             f"retrieval_backend={params['retrieval_backend']}, "
             f"base_llm={params['base_llm']}, "
             f"embedding_model={embedding_model or 'langchain-default'}, "
-            f"judge_llm={judge_llm or 'mlflow-default'}"
+            f"judge_llm={judge_llm or 'mlflow-default'}, "
+            f"system_prompt_uri={active_system_prompt['uri']}"
         ),
         params["verbose"],
     )
@@ -413,7 +524,7 @@ def main() -> None:
             params["verbose"],
         )
 
-    write_logged_model_config(params)
+    write_logged_model_config(params, active_system_prompt)
 
     logged_model_script = get_logged_model_script(params["mode"])
     model_code_paths = get_model_code_paths(
@@ -422,7 +533,12 @@ def main() -> None:
     )
 
     with mlflow.start_run(run_name=f"log_{model_name}"):
-        log_workflow_params(params, dataset_name, model_name)
+        log_workflow_params(
+            params,
+            dataset_name,
+            model_name,
+            active_system_prompt,
+        )
         print_status(
             f"Logging model '{model_name}' from {logged_model_script}...",
             params["verbose"],
@@ -504,6 +620,7 @@ def main() -> None:
             params,
             dataset_name,
             model_name,
+            active_system_prompt,
             evaluation_label=evaluation_label,
         )
         evaluation_results = mlflow.genai.evaluate(

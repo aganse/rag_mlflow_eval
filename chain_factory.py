@@ -1,6 +1,9 @@
 """Helpers for constructing the logged LangChain QA models."""
 
+import logging
 from typing import Any
+
+import mlflow
 
 from langchain_classic.chains import create_retrieval_chain
 from langchain_classic.chains.combine_documents import (
@@ -12,19 +15,7 @@ from langchain_openai import ChatOpenAI
 
 from retrieval_backends import get_retriever
 
-_RAG_SYSTEM_PROMPT = (
-    "Use the given context to answer the question. "
-    "Ignore any full sentences that are not in English. "
-    "If you don't know the answer, say you don't know. "
-    "Use three sentence maximum and keep the answer concise. "
-    "Context: {context}"
-)
-
-_NO_RAG_SYSTEM_PROMPT = (
-    "Answer the question to the best of your ability. "
-    "If you don't know the answer, say you don't know. "
-    "Use three sentence maximum and keep the answer concise."
-)
+_LOGGER = logging.getLogger(__name__)
 
 
 def build_chat_model(base_llm: str) -> ChatOpenAI:
@@ -81,10 +72,37 @@ def extract_answer(payload: Any) -> str:
     return str(payload)
 
 
+def link_prompt_to_active_trace(payload: dict[str, str], prompt_uri: str) -> dict[str, str]:
+    """Best-effort prompt load to let MLflow link prompts to active traces.
+
+    Args:
+        payload: The normalized chain input payload.
+        prompt_uri: The versioned MLflow prompt URI for the baked prompt.
+
+    Returns:
+        The unchanged payload so the runnable pipeline can continue.
+    """
+
+    try:
+        # Load the exact versioned prompt during traced execution for MLflow's
+        # prompt-linking side effects, while still using the baked template text
+        # for the actual chain prompt so the packaged model remains reproducible.
+        mlflow.genai.load_prompt(prompt_uri)
+    except Exception:
+        _LOGGER.warning(
+            "Failed to load prompt '%s' for MLflow trace linking.",
+            prompt_uri,
+            exc_info=True,
+        )
+    return payload
+
+
 def build_rag_model(
     retrieval_backend: str,
     base_llm: str,
     retrieval_top_k: int,
+    system_prompt: str,
+    system_prompt_uri: str,
     embedding_model: str | None = None,
 ) -> Any:
     """Build the retrieval-augmented QA model.
@@ -93,6 +111,8 @@ def build_rag_model(
         retrieval_backend: The retrieval backend short name.
         base_llm: The OpenAI chat model name used for answer generation.
         retrieval_top_k: The number of retrieved chunks to supply to the model.
+        system_prompt: The resolved system prompt template used for RAG answers.
+        system_prompt_uri: The versioned MLflow prompt URI used for trace linking.
         embedding_model: Optional embedding model override.
 
     Returns:
@@ -106,7 +126,7 @@ def build_rag_model(
     )
     prompt = ChatPromptTemplate.from_messages(
         [
-            ("system", _RAG_SYSTEM_PROMPT),
+            ("system", system_prompt),
             ("human", "{input}"),
         ]
     )
@@ -115,14 +135,27 @@ def build_rag_model(
         prompt,
     )
     chain = create_retrieval_chain(retriever, question_answer_chain)
-    return RunnableLambda(to_chain_input) | chain | RunnableLambda(extract_answer)
+    return (
+        RunnableLambda(to_chain_input)
+        | RunnableLambda(
+            lambda payload: link_prompt_to_active_trace(payload, system_prompt_uri)
+        )
+        | chain
+        | RunnableLambda(extract_answer)
+    )
 
 
-def build_no_rag_model(base_llm: str) -> Any:
+def build_no_rag_model(
+    base_llm: str,
+    system_prompt: str,
+    system_prompt_uri: str,
+) -> Any:
     """Build the no-RAG QA model used for the closed-book baseline.
 
     Args:
         base_llm: The OpenAI chat model name used for answer generation.
+        system_prompt: The resolved system prompt template used for no-RAG answers.
+        system_prompt_uri: The versioned MLflow prompt URI used for trace linking.
 
     Returns:
         The runnable LangChain model used for no-RAG predictions.
@@ -130,9 +163,15 @@ def build_no_rag_model(base_llm: str) -> Any:
 
     prompt = ChatPromptTemplate.from_messages(
         [
-            ("system", _NO_RAG_SYSTEM_PROMPT),
+            ("system", system_prompt),
             ("human", "{input}"),
         ]
     )
     chain = prompt | build_chat_model(base_llm) | RunnableLambda(extract_answer)
-    return RunnableLambda(to_chain_input) | chain
+    return (
+        RunnableLambda(to_chain_input)
+        | RunnableLambda(
+            lambda payload: link_prompt_to_active_trace(payload, system_prompt_uri)
+        )
+        | chain
+    )
